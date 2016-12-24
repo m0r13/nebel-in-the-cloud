@@ -4,14 +4,7 @@
 #include <Ticker.h>
 #include <WiFiClient.h> 
 
-//#define SOFTAP
-#ifdef SOFTAP
-const char *ssid = "HotspotForAHotbox";
-const char *password = "nebel-in-the-cloud";
-#else
-const char *ssid = "";
-const char *password = "";
-#endif
+#include "wificonfig.h"
 
 ESP8266WebServer server(80);
 Ticker ticker;
@@ -143,15 +136,15 @@ void setup() {
     setNebelRelay(false);
     ticker.attach_ms(200, update);
 
-#ifdef SOFT_AP
+#ifdef WIFI_AP
     Serial.print("Creating access point ");
-    Serial.println(ssid);
-    WiFi.softAP(ssid, password);
+    Serial.println(WIFI_SSID);
+    WiFi.softAP(WIFI_SSID, WIFI_PWD);
 #else
     Serial.print("Connecting to ");
-    Serial.print(ssid);
+    Serial.print(WIFI_SSID);
     WiFi.mode(WIFI_STA);
-    WiFi.begin(ssid, password);
+    WiFi.begin(WIFI_SSID, WIFI_PWD);
     while (WiFi.status() != WL_CONNECTED) {
         delay(500);
         Serial.print(".");
@@ -164,7 +157,7 @@ void setup() {
     }
     MDNS.addService("http", "tcp", 80);
 
-#ifdef SOFT_AP
+#ifdef WIFI_AP
     IPAddress myIP = WiFi.softAPIP();
 #else
     IPAddress myIP = WiFi.localIP();
