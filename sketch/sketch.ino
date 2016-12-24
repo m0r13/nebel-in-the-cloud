@@ -9,8 +9,8 @@
 const char *ssid = "HotspotForAHotbox";
 const char *password = "nebel-in-the-cloud";
 #else
-const char *ssid = "my-ssid";
-const char *password = "my-password";
+const char *ssid = "";
+const char *password = "";
 #endif
 
 ESP8266WebServer server(80);
@@ -55,13 +55,32 @@ void handleIndex() {
         <head> \
             <meta name='viewport' content='width=device-width, initial-scale=1.0, user-scalable=no'> \
             <script type='text/javascript'> \
+            var UPDATE_INTERVAL = 2000; \
+            var UPDATE_ERROR_INTERVAL = 5000; \
+            var runUpdates; \
+            var updater = null; \
+            function blur() { \
+                runUpdates = false; \
+                console.log('blur'); \
+                if (updater != null) { \
+                    window.clearTimeout(updater); \
+                    updater = null; \
+                } \
+            } \
+            function focus() { \
+                runUpdates = true; \
+                console.log('focus'); \
+                if (updater == null) { \
+                    updater = window.setTimeout(update, 1); \
+                } \
+            } \
             function formatUptime(uptime) { \
                 return '' + Math.round(uptime / 1000) + ' seconds'; \
             } \
             function update() { \
                 var r = new XMLHttpRequest(); \
-                r.onload = function() { \
-                    if (this.status == 200) { \
+                r.onreadystatechange = function() { \
+                    if (this.readyState == 4 && this.status == 200) { \
                         var data = JSON.parse(this.responseText); \
                         var status = document.getElementById('status'); \
                         status.innerHTML = data.available ? 'Nebel is available' : 'Nebel is unavailable'; \
@@ -69,14 +88,29 @@ void handleIndex() {
                         var uptime = document.getElementById('uptime'); \
                         uptime.innerHTML = formatUptime(data.uptime); \
                         console.log(data); \
+                        if (runUpdates) { \
+                            updater = window.setTimeout('update()', UPDATE_INTERVAL); \
+                        } else { \
+                            updater = null; \
+                        } \
+                    } else if (this.readyState == 4) { \
+                        var status = document.getElementById('status'); \
+                        status.innerHTML = 'Unable to update!'; \
+                        status.style.color = 'red'; \
+                        if (runUpdates) { \
+                            updater = window.setTimeout('update()', UPDATE_ERROR_INTERVAL); \
+                        } else { \
+                            updater = null; \
+                        } \
                     } \
                 }; \
+                r.timeout = 1000; \
                 r.open('GET', 'status', true); \
                 r.send(); \
             } \
             </script> \
         </head> \
-        <body onload='update(); setInterval(update, 3000)'> \
+        <body onload='focus(); window.addEventListener(\"focus\", focus); window.addEventListener(\"blur\", blur);'> \
             <h1 id='status'></h1> \
             <form action='/nebel'> \
                 <input type='submit' value='Nebel!' /> \
@@ -88,6 +122,8 @@ void handleIndex() {
 }
 
 void handleStatus() {
+    Serial.print("Status request ");
+    Serial.println(millis());
     char buf[512];
     snprintf(buf, 512, "{\"available\" : %d, \"uptime\" : %u}", nebelAvailable, millis());
     server.send(200, "text/plain", buf);
