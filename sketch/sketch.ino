@@ -4,8 +4,14 @@
 #include <Ticker.h>
 #include <WiFiClient.h> 
 
+//#define SOFTAP
+#ifdef SOFTAP
 const char *ssid = "HotspotForAHotbox";
 const char *password = "nebel-in-the-cloud";
+#else
+const char *ssid = "my-ssid";
+const char *password = "my-password";
+#endif
 
 ESP8266WebServer server(80);
 Ticker ticker;
@@ -38,7 +44,7 @@ void update() {
     nebelAvailable = !digitalRead(PIN_NEBEL_AVAILABLE);
     digitalWrite(PIN_LED, nebelAvailable);
     if (millis() > nebelUntil || !nebelAvailable) {
-        Serial.println("Disabling nebel.");
+        //Serial.println("Disabling nebel.");
         setNebelRelay(false);
     }
 }
@@ -75,14 +81,34 @@ void setup() {
     setNebelRelay(false);
     ticker.attach_ms(100, update);
 
-    Serial.println();
-    Serial.print("Configuring access point...");
-    /* You can remove the password parameter if you want the AP to be open. */
+#ifdef SOFT_AP
+    Serial.print("Creating access point ");
+    Serial.println(ssid);
     WiFi.softAP(ssid, password);
-    MDNS.begin ("nebel");
+#else
+    Serial.print("Connecting to ");
+    Serial.print(ssid);
+    WiFi.mode(WIFI_STA);
+    WiFi.begin(ssid, password);
+    while (WiFi.status() != WL_CONNECTED) {
+        delay(500);
+        Serial.print(".");
+    }
+    Serial.println(" Connected!");
+#endif
 
+    if (!MDNS.begin("nebel")) {
+        Serial.println("Warning: Unable to announce service via MDNS.");
+    }
+    MDNS.addService("http", "tcp", 80);
+
+#ifdef SOFT_AP
     IPAddress myIP = WiFi.softAPIP();
-    Serial.print("AP IP address: ");
+#else
+    IPAddress myIP = WiFi.localIP();
+#endif
+
+    Serial.print("IP address: ");
     Serial.println(myIP);
     server.on("/", handleIndex);
     server.on("/nebel", handleNebel);
