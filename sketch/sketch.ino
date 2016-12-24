@@ -50,21 +50,47 @@ void update() {
 }
 
 void handleIndex() {
+    static const char* index =
+        "<html> \
+        <head> \
+            <meta name='viewport' content='width=device-width, initial-scale=1.0, user-scalable=no'> \
+            <script type='text/javascript'> \
+            function formatUptime(uptime) { \
+                return '' + Math.round(uptime / 1000) + ' seconds'; \
+            } \
+            function update() { \
+                var r = new XMLHttpRequest(); \
+                r.onload = function() { \
+                    if (this.status == 200) { \
+                        var data = JSON.parse(this.responseText); \
+                        var status = document.getElementById('status'); \
+                        status.innerHTML = data.available ? 'Nebel is available' : 'Nebel is unavailable'; \
+                        status.style.color = data.available ? 'green' : 'red'; \
+                        var uptime = document.getElementById('uptime'); \
+                        uptime.innerHTML = formatUptime(data.uptime); \
+                        console.log(data); \
+                    } \
+                }; \
+                r.open('GET', 'status', true); \
+                r.send(); \
+            } \
+            </script> \
+        </head> \
+        <body onload='update(); setInterval(update, 3000)'> \
+            <h1 id='status'></h1> \
+            <form action='/nebel'> \
+                <input type='submit' value='Nebel!' /> \
+            </form> \
+            <div>Uptime: <span id='uptime'></span></div> \
+        </body> \
+        </html>";
+    server.send(200, "text/html", index);
+}
+
+void handleStatus() {
     char buf[512];
-    snprintf(buf, 512,
-        "<html>"
-        "<head>"
-            "<meta name='viewport' content='width=device-width, initial-scale=1.0, user-scalable=no'>"
-        "</head>"
-        "<body>"
-            "<h1 style='color: %s'>Nebel is %s</h1>"
-            "<form action='/nebel'>"
-                "<input type='submit' value='Nebel!' />"
-            "</form>"
-        "</body>"
-        "</html>",
-        nebelAvailable ? "green" : "red", nebelAvailable ? "available" : "not available");
-    server.send(200, "text/html", buf);
+    snprintf(buf, 512, "{\"available\" : %d, \"uptime\" : %u}", nebelAvailable, millis());
+    server.send(200, "text/plain", buf);
 }
 
 void handleNebel() {
@@ -79,7 +105,7 @@ void setup() {
     pinMode(PIN_LED, OUTPUT);
     pinMode(PIN_NEBEL_RELAY, OUTPUT);
     setNebelRelay(false);
-    ticker.attach_ms(100, update);
+    ticker.attach_ms(200, update);
 
 #ifdef SOFT_AP
     Serial.print("Creating access point ");
@@ -111,6 +137,7 @@ void setup() {
     Serial.print("IP address: ");
     Serial.println(myIP);
     server.on("/", handleIndex);
+    server.on("/status", handleStatus);
     server.on("/nebel", handleNebel);
     server.begin();
     Serial.println("HTTP server started");
