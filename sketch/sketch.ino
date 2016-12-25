@@ -80,6 +80,8 @@ void handleIndex() {
                 button.addEventListener('mouseup', mouseup); \
                 button.addEventListener('touchstart', mousedown); \
                 button.addEventListener('touchend', mouseup); \
+                document.body.addEventListener('keydown', keydown); \
+                document.body.addEventListener('keyup', keyup); \
             }; \
             function blur() { \
                 runUpdates = false; \
@@ -130,7 +132,7 @@ void handleIndex() {
                 r.open('GET', 'status', true); \
                 r.send(); \
             } \
-            function mousedown(e) { \
+            function mousedown() { \
                 console.log('mousedown'); \
                 runNebelUpdates = true; \
                 if (nebelUpdater == null) { \
@@ -146,6 +148,16 @@ void handleIndex() {
                     var r = new XMLHttpRequest(); \
                     r.open('GET', 'stopNebel', true); \
                     r.send(); \
+                } \
+            } \
+            function keydown(e) { \
+                if (e.keyCode == 78) { \
+                    mousedown(); \
+                } \
+            } \
+            function keyup(e) { \
+                if (e.keyCode == 78) { \
+                    mouseup(); \
                 } \
             } \
             function nebelUpdate() { \
