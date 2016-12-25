@@ -14,14 +14,16 @@ const int PIN_LED = 13;
 const int PIN_NEBEL_RELAY = D1;
 
 bool nebelAvailable = false;
+bool nebelStatus = false;
 unsigned long nebelUntil = 0;
 
 void setNebelRelay(bool closed) {
+    nebelStatus = closed;
     digitalWrite(PIN_NEBEL_RELAY, closed);
 }
 
-void doNebel(unsigned long duration) {
-    Serial.print("Attempting to do nebel for ");
+void startNebel(unsigned long duration) {
+    Serial.print("[nebel] Attempting to do nebel for ");
     Serial.print(duration);
     Serial.print("ms... ");
     if (nebelAvailable) {
@@ -33,16 +35,30 @@ void doNebel(unsigned long duration) {
     }
 }
 
+void stopNebel() {
+    nebelUntil = 0;
+    setNebelRelay(false);
+}
+
 void update() {
     nebelAvailable = !digitalRead(PIN_NEBEL_AVAILABLE);
     digitalWrite(PIN_LED, nebelAvailable);
-    if (millis() > nebelUntil || !nebelAvailable) {
-        //Serial.println("Disabling nebel.");
+    if (nebelStatus && (millis() > nebelUntil || !nebelAvailable)) {
+        Serial.println("[nebel] Disabling nebel.");
         setNebelRelay(false);
     }
 }
 
+void logRequest() {
+    Serial.print("[access] ");
+    Serial.print(server.method() == HTTP_GET ? "GET" : (server.method() == HTTP_POST ? "POST" : "OTHER"));
+    Serial.print(" ");
+    Serial.println(server.uri());
+}
+
 void handleIndex() {
+    logRequest();
+
     static const char* index =
         "<html> \
         <head> \
@@ -50,8 +66,21 @@ void handleIndex() {
             <script type='text/javascript'> \
             var UPDATE_INTERVAL = 2000; \
             var UPDATE_ERROR_INTERVAL = 5000; \
-            var runUpdates; \
+            var UPDATE_NEBEL_INTERVAL = 400; \
+            var runUpdates = true; \
             var updater = null; \
+            var runNebelUpdates = false; \
+            var nebelUpdater = null; \
+            function load() { \
+                focus(); \
+                window.addEventListener('focus', focus); \
+                window.addEventListener('blur', blur); \
+                var button = document.getElementById('button'); \
+                button.addEventListener('mousedown', mousedown); \
+                button.addEventListener('mouseup', mouseup); \
+                button.addEventListener('touchstart', mousedown); \
+                button.addEventListener('touchend', mouseup); \
+            }; \
             function blur() { \
                 runUpdates = false; \
                 console.log('blur'); \
@@ -101,31 +130,74 @@ void handleIndex() {
                 r.open('GET', 'status', true); \
                 r.send(); \
             } \
+            function mousedown(e) { \
+                console.log('mousedown'); \
+                runNebelUpdates = true; \
+                if (nebelUpdater == null) { \
+                    nebelUpdater = window.setTimeout(nebelUpdate, 1); \
+                } \
+            } \
+            function mouseup() { \
+                console.log('mouseup'); \
+                runNebelUpdates = false; \
+                if (nebelUpdater != null) { \
+                    window.clearTimeout(nebelUpdater); \
+                    nebelUpdater = null; \
+                    var r = new XMLHttpRequest(); \
+                    r.open('GET', 'stopNebel', true); \
+                    r.send(); \
+                } \
+            } \
+            function nebelUpdate() { \
+                var r = new XMLHttpRequest(); \
+                r.onreadystatechange = function() { \
+                    if (this.readyState == 4 && this.status == 200) { \
+                        if (runNebelUpdates) { \
+                            nebelUpdater = window.setTimeout('nebelUpdate()', UPDATE_NEBEL_INTERVAL); \
+                        } \
+                    } else if (this.readyState == 4) { \
+                    } \
+                }; \
+                r.timeout = 1000; \
+                r.open('GET', 'nebel', true); \
+                r.send(); \
+            } \
             </script> \
         </head> \
-        <body onload='focus(); window.addEventListener(\"focus\", focus); window.addEventListener(\"blur\", blur);'> \
+        <body onload='load()' style='font-family: Arial'> \
             <h1 id='status'></h1> \
-            <form action='/nebel'> \
+            <button style='width: 100\%; font-size: 3em; padding: 30px' id='button'>Ja Power Diggha!</button> \
+            <!--<form action='/nebel'> \
                 <input type='submit' value='Nebel!' /> \
-            </form> \
-            <div>Uptime: <span id='uptime'></span></div> \
+            </form>--> \
+            <div style='margin-top: 10px'>ESP Uptime: <span id='uptime'></span></div> \
         </body> \
         </html>";
     server.send(200, "text/html", index);
 }
 
 void handleStatus() {
-    Serial.print("Status request ");
-    Serial.println(millis());
+    logRequest();
+
     char buf[512];
     snprintf(buf, 512, "{\"available\" : %d, \"uptime\" : %u}", nebelAvailable, millis());
     server.send(200, "text/plain", buf);
 }
 
 void handleNebel() {
-    doNebel(1000);
-    server.sendHeader("Location", "/", true);
-    server.send(302, "text/plain", "");
+    logRequest();
+
+    startNebel(1000);
+    server.send(200, "text/plain", "");
+    //server.sendHeader("Location", "/", true);
+    //server.send(302, "text/plain", "");
+}
+
+void handleStopNebel() {
+    logRequest();
+
+    stopNebel();
+    server.send(200, "text/plain", "");
 }
 
 void setup() {
@@ -168,6 +240,7 @@ void setup() {
     server.on("/", handleIndex);
     server.on("/status", handleStatus);
     server.on("/nebel", handleNebel);
+    server.on("/stopNebel", handleStopNebel);
     server.begin();
     Serial.println("HTTP server started");
 }
