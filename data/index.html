@@ -1,0 +1,126 @@
+<html>
+    <head>
+        <meta name='viewport' content='width=device-width, initial-scale=1.0, user-scalable=no'>
+        <script type='text/javascript'>
+        var UPDATE_INTERVAL = 2000;
+        var UPDATE_ERROR_INTERVAL = 5000;
+        var UPDATE_NEBEL_INTERVAL = 400;
+        var runUpdates = true;
+        var updater = null;
+        var runNebelUpdates = false;
+        var nebelUpdater = null;
+        function load() {
+            focus();
+            window.addEventListener('focus', focus);
+            window.addEventListener('blur', blur);
+            var button = document.getElementById('button');
+            button.addEventListener('mousedown', mousedown);
+            button.addEventListener('mouseup', mouseup);
+            button.addEventListener('touchstart', mousedown);
+            button.addEventListener('touchend', mouseup);
+            document.body.addEventListener('keydown', keydown);
+            document.body.addEventListener('keyup', keyup);
+        };
+        function blur() {
+            runUpdates = false;
+            console.log('blur');
+            if (updater != null) {
+                window.clearTimeout(updater);
+                updater = null;
+            }
+        }
+        function focus() {
+            runUpdates = true;
+            console.log('focus');
+            if (updater == null) {
+                updater = window.setTimeout(update, 1);
+            }
+        }
+        function formatUptime(uptime) {
+            return '' + Math.round(uptime / 1000) + ' seconds';
+        }
+        function update() {
+            var r = new XMLHttpRequest();
+            r.onreadystatechange = function() {
+                if (this.readyState == 4 && this.status == 200) {
+                    var data = JSON.parse(this.responseText);
+                    var status = document.getElementById('status');
+                    status.innerHTML = data.available ? 'Nebel is available' : 'Nebel is unavailable';
+                    status.style.color = data.available ? 'green' : 'red';
+                    var uptime = document.getElementById('uptime');
+                    uptime.innerHTML = formatUptime(data.uptime);
+                    console.log(data);
+                    if (runUpdates) {
+                        updater = window.setTimeout('update()', UPDATE_INTERVAL);
+                    } else {
+                        updater = null;
+                    }
+                } else if (this.readyState == 4) {
+                    var status = document.getElementById('status');
+                    status.innerHTML = 'Unable to update!';
+                    status.style.color = 'red';
+                    if (runUpdates) {
+                        updater = window.setTimeout('update()', UPDATE_ERROR_INTERVAL);
+                    } else {
+                        updater = null;
+                    }
+                }
+            };
+            r.timeout = 1000;
+            r.open('GET', 'status', true);
+            r.send();
+        }
+        function mousedown() {
+            console.log('mousedown');
+            runNebelUpdates = true;
+            if (nebelUpdater == null) {
+                nebelUpdater = window.setTimeout(nebelUpdate, 1);
+            }
+        }
+        function mouseup() {
+            console.log('mouseup');
+            runNebelUpdates = false;
+            if (nebelUpdater != null) {
+                window.clearTimeout(nebelUpdater);
+                nebelUpdater = null;
+                var r = new XMLHttpRequest();
+                r.open('GET', 'stopNebel', true);
+                r.send();
+            }
+        }
+        function keydown(e) {
+            if (e.keyCode == 78) {
+                mousedown();
+            }
+        }
+        function keyup(e) {
+            if (e.keyCode == 78) {
+                mouseup();
+            }
+        }
+        function nebelUpdate() {
+            var r = new XMLHttpRequest();
+            r.onreadystatechange = function() {
+                if (this.readyState == 4 && this.status == 200) {
+                    if (runNebelUpdates) {
+                        nebelUpdater = window.setTimeout('nebelUpdate()', UPDATE_NEBEL_INTERVAL);
+                    }
+                } else if (this.readyState == 4) {
+                }
+            };
+            r.timeout = 1000;
+            r.open('GET', 'nebel', true);
+            r.send();
+        }
+        </script>
+    </head>
+    <body onload='load()' style='font-family: Arial'>
+        <h1 id='status'></h1>
+        <!--<button style='width: 100\%; font-size: 3em; padding: 30px' id='button'>Power Diggha!</button>--> 
+        <div id='button' style='width: 300px; height: 300px; margin-left: auto; margin-right: auto; background: url(redbutton.svg); -webkit-touch-callout:none;-webkit-user-select:none;-khtml-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;-webkit-tap-highlight-color:rgba(0,0,0,0);'></div>
+        <!--<form action='/nebel'>
+            <input type='submit' value='Nebel!' />
+        </form>-->
+        <div style='margin-top: 10px'>ESP Uptime: <span id='uptime'></span></div>
+    </body>
+</html>
