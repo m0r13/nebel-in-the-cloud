@@ -1,6 +1,14 @@
 <html>
     <head>
         <meta name='viewport' content='width=device-width, initial-scale=1.0, user-scalable=no'>
+        <style type='text/css'>
+        .button {
+            width: 300px;
+            height: 300px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        </style>
         <script type='text/javascript'>
         var UPDATE_INTERVAL = 2000;
         var UPDATE_ERROR_INTERVAL = 5000;
@@ -13,7 +21,7 @@
             focus();
             window.addEventListener('focus', focus);
             window.addEventListener('blur', blur);
-            var button = document.getElementById('button');
+            var button = document.getElementById('button-enabled');
             button.addEventListener('mousedown', mousedown);
             button.addEventListener('mouseup', mouseup);
             button.addEventListener('touchstart', mousedown);
@@ -39,16 +47,33 @@
         function formatUptime(uptime) {
             return '' + Math.round(uptime / 1000) + ' seconds';
         }
+        function setButton(enabled) {
+            document.getElementById('button-enabled').style.display = enabled ? 'block' : 'none';
+            document.getElementById('button-disabled').style.display = !enabled ? 'block' : 'none';
+        }
+        function setStatus(data) {
+            var statusText = "Unable to update!";
+            var statusColor = "red";
+            var uptimeText = "Unknown";
+            if (data != null) {
+                statusText = data.available ? 'Nebel is available' : 'Nebel is unavailable';
+                statusColor = data.available ? 'green' : 'red';
+                setButton(data.available);
+                uptimeText = formatUptime(data.uptime);
+            }
+
+            var status = document.getElementById('status');
+            status.innerHTML = statusText;
+            status.style.color = statusColor;
+            var uptime = document.getElementById('uptime');
+            uptime.innerHTML = uptimeText;
+        }
         function update() {
             var r = new XMLHttpRequest();
             r.onreadystatechange = function() {
                 if (this.readyState == 4 && this.status == 200) {
                     var data = JSON.parse(this.responseText);
-                    var status = document.getElementById('status');
-                    status.innerHTML = data.available ? 'Nebel is available' : 'Nebel is unavailable';
-                    status.style.color = data.available ? 'green' : 'red';
-                    var uptime = document.getElementById('uptime');
-                    uptime.innerHTML = formatUptime(data.uptime);
+                    setStatus(data);
                     console.log(data);
                     if (runUpdates) {
                         updater = window.setTimeout('update()', UPDATE_INTERVAL);
@@ -56,9 +81,7 @@
                         updater = null;
                     }
                 } else if (this.readyState == 4) {
-                    var status = document.getElementById('status');
-                    status.innerHTML = 'Unable to update!';
-                    status.style.color = 'red';
+                    setStatus(null);
                     if (runUpdates) {
                         updater = window.setTimeout('update()', UPDATE_ERROR_INTERVAL);
                     } else {
@@ -116,8 +139,8 @@
     </head>
     <body onload='load()' style='font-family: Arial'>
         <h1 id='status'></h1>
-        <!--<button style='width: 100\%; font-size: 3em; padding: 30px' id='button'>Power Diggha!</button>--> 
-        <div id='button' style='width: 300px; height: 300px; margin-left: auto; margin-right: auto; background: url(redbutton.svg); -webkit-touch-callout:none;-webkit-user-select:none;-khtml-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;-webkit-tap-highlight-color:rgba(0,0,0,0);'></div>
+        <div class="button" id='button-disabled' style='display: none; background: url(graybutton.svg);'></div>
+        <div class="button" id='button-enabled' style='display: block; background: url(redbutton.svg); -webkit-touch-callout:none;-webkit-user-select:none;-khtml-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;-webkit-tap-highlight-color:rgba(0,0,0,0);'></div>
         <!--<form action='/nebel'>
             <input type='submit' value='Nebel!' />
         </form>-->
