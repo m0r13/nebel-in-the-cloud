@@ -1,9 +1,15 @@
-SKETCH=sketch/sketch.ino
-BOARD=esp8266:esp8266:nodemcu
 PORT=/dev/ttyUSB0
 
-verify:
-	arduino --board $(BOARD) --verify $(SKETCH)
+all: build
+
+build:
+	platformio run
 
 upload:
-	arduino --board $(BOARD) --upload $(SKETCH) --port $(PORT)
+	platformio run --target upload
+
+upload-fs:
+	platformio run --target buildfs && platformui --target uploadfs
+
+serial:
+	platformio device monitor -b 115200
