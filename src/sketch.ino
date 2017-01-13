@@ -6,6 +6,7 @@
 #include <WiFiClient.h> 
 
 #include "wificonfig.h"
+#include "StatusLED.h"
 
 ESP8266WebServer server(80);
 Ticker ticker;
@@ -13,6 +14,8 @@ Ticker ticker;
 const int PIN_NEBEL_AVAILABLE = D0;
 const int PIN_LED = 13;
 const int PIN_NEBEL_RELAY = D1;
+
+StatusLED statusLED(D2, D3, D4);
 
 bool nebelAvailable = false;
 bool nebelStatus = false;
@@ -44,6 +47,14 @@ void stopNebel() {
 void update() {
     nebelAvailable = !digitalRead(PIN_NEBEL_AVAILABLE);
 //    nebelAvailable = true;
+//    nebelAvailable = (millis() / 4000) % 2;
+    if (nebelAvailable && !nebelStatus) {
+        statusLED.setColor(0, 255, 0);
+    } else if (nebelAvailable && nebelStatus) {
+        statusLED.setColor(0, 0, 255);
+    } else {
+        statusLED.setColor(255, 0, 0);
+    }
     digitalWrite(PIN_LED, nebelAvailable);
     if (nebelStatus && (millis() > nebelUntil || !nebelAvailable)) {
         Serial.println("[nebel] Disabling nebel.");
@@ -120,10 +131,10 @@ void setup() {
     pinMode(PIN_LED, OUTPUT);
     pinMode(PIN_NEBEL_RELAY, OUTPUT);
     setNebelRelay(false);
-    ticker.attach_ms(500, update);
 
     SPIFFS.begin();
 
+    statusLED.setColor(255, 0, 255);
 #ifdef WIFI_AP
     Serial.print("Creating access point ");
     Serial.println(WIFI_SSID);
@@ -135,13 +146,17 @@ void setup() {
     WiFi.setAutoReconnect(true);
     WiFi.begin(WIFI_SSID, WIFI_PWD);
     WiFi.reconnect();
+    bool led = true;
     while (WiFi.status() != WL_CONNECTED) {
         delay(500);
-        //Serial.print(".");
+        led = !led;
+        statusLED.setColor(led * 255, 0, led * 255);
         Serial.println(WiFi.status());
     }
     Serial.println(" Connected!");
 #endif
+    update();
+    ticker.attach_ms(500, update);
 
     if (!MDNS.begin("nebel")) {
         Serial.println("Warning: Unable to announce service via MDNS.");
